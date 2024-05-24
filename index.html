@@ -3,70 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Grabar y Enviar Audio</title>
+    <title>Grabadora de Audio</title>
+    <style>
+        button {
+            margin: 10px;
+            padding: 10px;
+            font-size: 16px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Grabar y Enviar Audio</h1>
-    <button onclick="startRecording()">Comenzar Grabación</button>
-    <button onclick="stopRecording()">Detener Grabación</button>
-    <button onclick="sendAudio()">Enviar Audio</button>
-    <button onclick="readyToPlay()">Listo para Reproducir</button>
-    
+    <h1>Grabadora de Audio</h1>
+    <button id="startRecord" onclick="startRecording()">Iniciar Grabación</button>
+    <button id="stopRecord" onclick="stopRecording()" disabled>Detener Grabación</button>
+    <button id="sendAudio" onclick="sendAudio()" disabled>Enviar Audio</button>
+
     <script>
-        let mediaRecorder;
-        let chunks = [];
+        let recorder;
+        let audioChunks = [];
 
         async function startRecording() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                mediaRecorder.addEventListener('dataavailable', event => {
-                    chunks.push(event.data);
-                });
-                mediaRecorder.start();
-            } catch (error) {
-                console.error('Error al acceder al micrófono:', error);
-            }
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            recorder = new MediaRecorder(stream);
+            recorder.ondataavailable = event => {
+                audioChunks.push(event.data);
+            };
+            recorder.start();
+            document.getElementById('startRecord').disabled = true;
+            document.getElementById('stopRecord').disabled = false;
         }
 
         function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-                mediaRecorder.stop();
-            }
+            recorder.stop();
+            document.getElementById('startRecord').disabled = false;
+            document.getElementById('stopRecord').disabled = true;
+            document.getElementById('sendAudio').disabled = false;
         }
 
         function sendAudio() {
-            const blob = new Blob(chunks, { type: 'audio/wav' });
+            const blob = new Blob(audioChunks, { type: 'audio/wav' });
             const formData = new FormData();
-            formData.append('audio', blob, 'audio.wav');
-            fetch('/saveAudio', {
+            formData.append('audio', blob);
+
+            fetch('http://tu_ip_esp32/guardar_audio', {
                 method: 'POST',
                 body: formData
-            }).then(response => {
-                if (response.ok) {
-                    alert('Audio enviado exitosamente');
-                } else {
-                    alert('Error al enviar audio');
-                }
-            }).catch(error => {
+            })
+            .then(response => {
+                console.log('Audio enviado con éxito');
+            })
+            .catch(error => {
                 console.error('Error al enviar audio:', error);
-                alert('Error al enviar audio');
             });
-        }
 
-        function readyToPlay() {
-            fetch('/readyToPlay', {
-                method: 'POST',
-            }).then(response => {
-                if (response.ok) {
-                    alert('Listo para reproducir audio');
-                } else {
-                    alert('Error al enviar señal');
-                }
-            }).catch(error => {
-                console.error('Error al enviar señal:', error);
-                alert('Error al enviar señal');
-            });
+            // Limpiar audioChunks para la próxima grabación
+            audioChunks = [];
+            document.getElementById('sendAudio').disabled = true;
         }
     </script>
 </body>
